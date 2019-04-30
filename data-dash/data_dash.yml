@@ -34,274 +34,31 @@ Parameters:
     Type: String
     Description: Github OAuth token used to pull code and add hook.
     NoEcho: true
-Resources: 
-  DataDashVPC:
-    Type: AWS::EC2::VPC
+Resources:
+  Vpc:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      CidrBlock: 192.168.0.0/16
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      InstanceTenancy: default
-      Tags:
-        - Key: Name
-          Value: ScrapyVPC
-  DataDashSubnet1:
-    Type: AWS::EC2::Subnet
+      TemplateURL: !Ref VpcTemplateUrl #xxx
+      Parameters
+  Elasticsearch:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      CidrBlock: 192.168.0.0/24
-      VpcId: !Ref DataDashVPC
-      MapPublicIpOnLaunch: true
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-  InternetGatewayAttachement:
-    Type: AWS::EC2::VPCGatewayAttachment
+      TemplateURL: !Ref ElasticsearchTemplateUrl #xxx
+      Parameters:
+  Ec2:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      VpcId: !Ref 'DataDashVPC'
-      InternetGatewayId: !Ref 'InternetGateway'
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
+      TemplateURL: !Ref Ec2TemplateUrl #xxx
+      Parameters:
+        KeyName: !Ref KeyName
+        InstanceType: !Ref InstanceType
+        VpcId: !Ref VpcId
+        SubnetId: !GetAtt Vpc.PublicSubnet1
+  CodePipeline:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      VpcId: !Ref 'DataDashVPC'
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachement
-    Properties:
-      RouteTableId: !Ref 'PublicRouteTable'
-      DestinationCidrBlock: '0.0.0.0/0'
-      GatewayId: !Ref 'InternetGateway'
-  PublicSubnetOneRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    DependsOn:
-      - PublicRoute
-      - PublicRouteTable
-    Properties:
-      SubnetId: !Ref DataDashSubnet1
-      RouteTableId: !Ref PublicRouteTable
-  ScrapySecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: prod-scrapy
-      GroupDescription: >-
-        Allow 6800 for daemon and 22 for SSH
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref AdminIP
-      VpcId: !Ref DataDashVPC
-  ScrapyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement: 
-          - Effect: Allow
-            Principal: 
-              Service: 
-                - ec2.amazonaws.com
-            Action: 
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess # change this
-  ScrapyInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref ScrapyRole
-  ScrapyEc2:
-    Type: AWS::EC2::Instance
-    DependsOn:
-      - PublicSubnetOneRouteTableAssociation
-    Metadata:
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              ruby: []
-          files:
-            /home/ec2-user/install:
-              source: !Join
-                - ''
-                - - https://aws-codedeploy-
-                  - !Ref AWS::Region
-                  - .s3.amazonaws.com/latest/install
-              mode: '000755'
-          commands:
-            00-install-agent:
-              command: ./install auto
-              cwd: /home/ec2-user/
-            01-cfn-signal:
-              command: !Join
-                - ''
-                - - '/opt/aws/bin/cfn-signal -e 0 --stack '
-                  - !Ref AWS::StackName
-                  - ' --resource '
-                  - ' ScrapyEc2 '
-    Properties:
-      KeyName: !Ref KeyName
-      ImageId: ami-0de53d8956e8dcf80
-      InstanceType: !Ref InstanceType
-      SecurityGroupIds:
-        - !Ref ScrapySecurityGroup
-      IamInstanceProfile: !Ref ScrapyInstanceProfile
-      SubnetId: !Ref DataDashSubnet1
-      Tags:
-        - Key: project
-          Value: data-dash
-        - Key: environment
-          Value: production
-      UserData: !Base64
-        "Fn::Join":
-          - ''
-          - - "#!/bin/bash\n"
-            - "yum -y update\n"
-            - "yum -y install cfn-bootstrap\n"
-            - "/opt/aws/bin/cfn-init -v "
-            - " --stack "
-            - !Ref AWS::StackName
-            - " --resource ScrapyEc2"
-  ElasticsearchSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: prod-es
-      GroupDescription: >-
-        Allow 443 port 
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref AdminIP
-      VpcId: !Ref DataDashVPC
-  ElasticsearchDomain:
-    Type: AWS::Elasticsearch::Domain
-    Properties:
-      ElasticsearchClusterConfig:
-        InstanceCount: 1
-        InstanceType: t2.small.elasticsearch
-      EBSOptions:
-        EBSEnabled: true
-        VolumeType: gp2
-        VolumeSize: 10
-      VPCOptions: 
-        SecurityGroupIds:
-          - !Ref ElasticsearchSecurityGroup
-        SubnetIds:
-          - !Ref DataDashSubnet1
-  DataDashApplication:
-    Type: AWS::CodeDeploy::Application
-    Properties:
-      ApplicationName: p-data-dash
-      ComputePlatform: Server
-  DataDashDeployRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement: 
-          - Effect: Allow
-            Principal: 
-              Service: 
-                - codedeploy.amazonaws.com
-            Action: 
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
-  DataDashDeploymentGroup:
-    Type: AWS::CodeDeploy::DeploymentGroup
-    Properties:
-      ApplicationName: p-data-dash
-      ServiceRoleArn: !GetAtt DataDashDeployRole.Arn
-      Ec2TagSet:
-        Ec2TagSetList:
-          - Ec2TagGroup:
-            - Key: project
-              Value: data-dash
-              Type: KEY_AND_VALUE
-          - Ec2TagGroup:
-            - Key: environment
-              Value: production
-              Type: KEY_AND_VALUE
-  DataDashPipelineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement: 
-          - Effect: Allow
-            Principal: 
-              Service: 
-                - codepipeline.amazonaws.com
-            Action: 
-              - sts:AssumeRole
-      Policies:
-        - PolicyName: policy-pass-role
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement: 
-              - Effect: Allow
-                Resource: '*'
-                Action: 
-                  - iam:PassRole # should add condition
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
-        - arn:aws:iam::aws:policy/AWSCodeDeployFullAccess
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess # should change this
-  DataDashS3ArtifactStore:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-  DataDashPipeline:
-    Type: AWS::CodePipeline::Pipeline
-    DependsOn: 
-      - ScrapyEc2
-      - ElasticsearchDomain
-    Properties:
-      Name: p-data-dash
-      ArtifactStore:
-        Type: S3
-        Location: !Ref DataDashS3ArtifactStore
-      Stages:
-        - Name: Commit
-          Actions:
-            - Name: PullSource
-              ActionTypeId:
-                Category: Source
-                Owner: ThirdParty
-                Provider: GitHub
-                Version: 1
-              RunOrder: 1
-              Configuration:
-                Branch: master
-                OAuthToken: !Ref GithubOAuthToken
-                Owner: !Ref GithubUser
-                PollForSourceChanges: false
-                Repo: !Ref GithubRepo
-              OutputArtifacts:
-                - Name: SourceArtifact
-        - Name: Deploy
-          Actions:
-            - Name: DeployToScrapyEc2
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: CodeDeploy
-                Version: 1
-              RunOrder: 1
-              Configuration:
-                ApplicationName: p-data-dash
-                DeploymentGroupName: !Ref DataDashDeploymentGroup
-              InputArtifacts:
-                - Name: SourceArtifact
-      RoleArn: !GetAtt DataDashPipelineRole.Arn
-      RestartExecutionOnUpdate: true
+      TemplateURL: !Ref CodePipelineTemplateUrl #xxx
+      Parameters:
+        GithubUser: !Ref GithubUser
+        GithubRepo: !Ref GithubRepo
+        GithubOAuthToken: !Ref GithubOAuthToken

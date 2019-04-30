@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: 2019-04-30
+Description: >-
+  CodePipeline and CodeDeploy
+Parameters:
+  GithubUser:
+    Type: String
+    Description: You Github account name.
+  GithubRepo:
+    Type: String
+    Description: Repo name in your Github account.
+  GithubOAuthToken:
+    Type: String
+    Description: Github OAuth token used to pull code and add hook.
+    NoEcho: true
+Resources:
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: p-data-dash
+      ComputePlatform: Server
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: 
+                - codedeploy.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: p-data-dash
+      ServiceRoleArn: !GetAtt CodeDeployRole.Arn
+      Ec2TagSet:
+        Ec2TagSetList:
+          - Ec2TagGroup:
+            - Key: project
+              Value: data-dash
+              Type: KEY_AND_VALUE
+          - Ec2TagGroup:
+            - Key: environment
+              Value: production
+              Type: KEY_AND_VALUE
+  CodeDeployPipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: 
+                - codepipeline.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: policy-pass-role
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement: 
+              - Effect: Allow
+                Resource: '*'
+                Action: 
+                  - iam:PassRole # should add condition
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeDeployFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess # should add restriction
+  S3ArtifactStore:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: p-data-dash
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3ArtifactStore
+      Stages:
+        - Name: Commit
+          Actions:
+            - Name: PullSource
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              RunOrder: 1
+              Configuration:
+                Branch: master
+                OAuthToken: !Ref GithubOAuthToken
+                Owner: !Ref GithubUser
+                PollForSourceChanges: false
+                Repo: !Ref GithubRepo
+              OutputArtifacts:
+                - Name: SourceArtifact
+        - Name: Deploy
+          Actions:
+            - Name: DeployToScrapyEc2
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              RunOrder: 1
+              Configuration:
+                ApplicationName: p-data-dash
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              InputArtifacts:
+                - Name: SourceArtifact
+      RoleArn: !GetAtt PipelineRole.Arn
+      RestartExecutionOnUpdate: true
