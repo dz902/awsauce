@@ -42,6 +42,10 @@ Resources:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 Outputs:
+  VpcId:
+    Value: !Ref VPC
+    Export:
+      Name: VpcId
   PublicSubnet1:
     Value: !Ref PublicSubnet1
     Export:

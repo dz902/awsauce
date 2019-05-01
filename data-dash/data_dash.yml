@@ -47,7 +47,7 @@ Resources:
     Properties:
       TemplateURL: !Join ['', [!Ref S3BucketURL, '/', 'elasticsearch.yml']] 
       Parameters:
-        VpcId: !Ref Vpc
+        VpcId: !GetAtt Vpc.Outputs.VpcId
         SubnetId: !GetAtt Vpc.Outputs.PublicSubnet1
   Ec2:
     Type: AWS::CloudFormation::Stack
@@ -56,7 +56,7 @@ Resources:
       Parameters:
         KeyName: !Ref KeyName
         InstanceType: !Ref InstanceType
-        VpcId: !Ref Vpc
+        VpcId: !GetAtt Vpc.Outputs.VpcId
         PublicSubnetId: !GetAtt Vpc.Outputs.PublicSubnet1
   CodePipeline:
     Type: AWS::CloudFormation::Stack
