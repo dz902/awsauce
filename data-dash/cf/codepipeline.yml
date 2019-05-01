@@ -16,7 +16,6 @@ Resources:
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
-      ApplicationName: p-data-dash
       ComputePlatform: Server
   CodeDeployRole:
     Type: AWS::IAM::Role
@@ -35,7 +34,7 @@ Resources:
   CodeDeployDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
-      ApplicationName: p-data-dash
+      ApplicationName: !Ref CodeDeployApplication
       ServiceRoleArn: !GetAtt CodeDeployRole.Arn
       Ec2TagSet:
         Ec2TagSetList:
@@ -47,7 +46,7 @@ Resources:
             - Key: environment
               Value: production
               Type: KEY_AND_VALUE
-  CodeDeployPipelineRole:
+  CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -82,7 +81,6 @@ Resources:
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: p-data-dash
       ArtifactStore:
         Type: S3
         Location: !Ref S3ArtifactStore
@@ -114,9 +112,9 @@ Resources:
                 Version: 1
               RunOrder: 1
               Configuration:
-                ApplicationName: p-data-dash
+                ApplicationName: !Ref CodeDeployApplication
                 DeploymentGroupName: !Ref CodeDeployDeploymentGroup
               InputArtifacts:
                 - Name: SourceArtifact
-      RoleArn: !GetAtt PipelineRole.Arn
+      RoleArn: !GetAtt CodePipelineRole.Arn
       RestartExecutionOnUpdate: true

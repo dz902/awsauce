@@ -24,6 +24,9 @@ Parameters:
     Default: 0.0.0.0/0
     AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
     ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  S3BucketURL:
+    Type: String
+    Description: The bucket containing all nested stacks.
   GithubUser:
     Type: String
     Description: You Github account name.
@@ -38,27 +41,27 @@ Resources:
   Vpc:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/vpc.yml
+      TemplateURL: !Join ['', [!Ref S3BucketURL, '/', 'vpc.yml']] 
   Elasticsearch:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/elasticsearch.yml
+      TemplateURL: !Join ['', [!Ref S3BucketURL, '/', 'elasticsearch.yml']] 
       Parameters:
         VpcId: !Ref Vpc
-        SubnetId: !ImportValue PublicSubnet1
+        SubnetId: !GetAtt Vpc.Outputs.PublicSubnet1
   Ec2:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/ec2.yml
+      TemplateURL: !Join ['', [!Ref S3BucketURL, '/', 'ec2.yml']]
       Parameters:
         KeyName: !Ref KeyName
         InstanceType: !Ref InstanceType
         VpcId: !Ref Vpc
-        SubnetId: !ImportValue PublicSubnet1
+        PublicSubnetId: !GetAtt Vpc.Outputs.PublicSubnet1
   CodePipeline:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/codepipeline.yml
+      TemplateURL: !Join ['', [!Ref S3BucketURL, '/', 'codepipeline.yml']]
       Parameters:
         GithubUser: !Ref GithubUser
         GithubRepo: !Ref GithubRepo
