@@ -38,26 +38,27 @@ Resources:
   Vpc:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref VpcTemplateUrl #xxx
-      Parameters
+      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/vpc.yml
   Elasticsearch:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref ElasticsearchTemplateUrl #xxx
+      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/elasticsearch.yml
       Parameters:
+        VpcId: !Ref Vpc
+        SubnetId: !ImportValue PublicSubnet1
   Ec2:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref Ec2TemplateUrl #xxx
+      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/ec2.yml
       Parameters:
         KeyName: !Ref KeyName
         InstanceType: !Ref InstanceType
-        VpcId: !Ref VpcId
-        SubnetId: !GetAtt Vpc.PublicSubnet1
+        VpcId: !Ref Vpc
+        SubnetId: !ImportValue PublicSubnet1
   CodePipeline:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Ref CodePipelineTemplateUrl #xxx
+      TemplateURL: https://raw.githubusercontent.com/dz902/awsauce/master/data-dash/cf/codepipeline.yml
       Parameters:
         GithubUser: !Ref GithubUser
         GithubRepo: !Ref GithubRepo

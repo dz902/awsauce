@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2019-04-30
+AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   Amazon EC2 service
 Parameters:

@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2019-04-30
+AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   VPC with 1 public subnet
 Resources:
@@ -41,3 +41,8 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
+Outputs:
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: PublicSubnet1
