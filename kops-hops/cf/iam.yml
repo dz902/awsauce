@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  "Create a dedicated user for kops, with full access to VPC, EC2, S3, IAM."
+Parameters:
+  UserName:
+    Type: String
+    Description: User name for the IAM user
+    Default: user-kops
+Resources:
+  KopsUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref UserName
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/IAMFullAccess
+        - arn:aws:iam::aws:policy/AmazonVPCFullAccess
