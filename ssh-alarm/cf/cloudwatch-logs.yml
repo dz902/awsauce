@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudWatch Logs to receive logs from SSH.
+Resources:
+  SSHLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 7
+  InvalidUserFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref SSHLogGroup
+      FilterPattern: "[Mon, day, timestamp, ip, id, status = Invalid, ...]"
+      MetricTransformations:
+      - MetricValue: 1
+        MetricNamespace: SSH
+        MetricName: sshInvalidUser
+  InvalidUserAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The number of invalid users is greater than 2 over 5 minutes
+      MetricName: sshInvalidUser
+      Namespace: SSH
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2
+      AlarmActions:
+      - !Ref AlarmNotificationTopic
+      ComparisonOperator: GreaterThanThreshold
+  SuspiciousAccessNotification:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint: !Ref OperatorEmail
+        Protocol: email
